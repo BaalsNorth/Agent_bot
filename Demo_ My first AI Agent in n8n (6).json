@@ -1,0 +1,833 @@
+{
+  "name": "Demo: My first AI Agent in n8n",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {
+          "download": true
+        }
+      },
+      "id": "30e828e3-fd9d-44db-88a1-2415818236e3",
+      "name": "telegramInput",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "position": [
+        -320,
+        848
+      ],
+      "webhookId": "f56e8e22-975e-4f9a-a6f9-253ebc63668d",
+      "typeVersion": 1.1,
+      "credentials": {
+        "telegramApi": {
+          "id": "VKD4D8IPphgg7EPh",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json; // из Telegram Trigger\n\nconst message = body.message || body.Message || {};\nif (!message) return { json: { error: 'No message found' } };\n\nconst chatId = message.chat.id;\nconst userId = message.from.id;\nconst username = message.from.username || message.from.first_name || 'User';\n\nlet messageText = '';\nlet messageType = 'text';\nlet fileId = null;\nlet fileMimeType = null;\nlet filePath = null;\nlet fileUniqueId = null;\n\n// Определяем тип сообщения и подготавливаем fileId\nif (message.text) {\n  messageText = message.text;\n  messageType = 'text';\n} else if (message.voice) {\n  messageType = 'voice';\n  fileId = message.voice.file_id;\n  fileMimeType = message.voice.mime_type;\n  messageText = '[Голосовое сообщение]';\n} else if (message.audio) {\n  messageType = 'audio';\n  fileId = message.audio.file_id;\n  fileMimeType = message.audio.mime_type;\n  messageText = '[Аудио сообщение]';\n} else if (message.document) {\n  messageType = 'document';\n  fileId = message.document.file_id;\n  fileMimeType = message.document.mime_type;\n  messageText = `[Документ: ${message.document.file_name || 'unknown'}]`;\n} else if (message.photo) {\n  messageType = 'photo';\n  const photos = message.photo;\n  fileId = photos[photos.length - 1].file_id;\n  messageText = '[Фотография]';\n} else {\n  messageText = '[Неподдерживаемый тип сообщения]';\n}\n\n// Основной JSON объект\nconst jsonOutput = {\n  chatId,\n  userId,\n  username,\n  messageText,\n  messageType,\n  fileId,\n  fileMimeType,\n  originalMessage: message\n};\n\n// Вернём и бинарный объект, если есть fileId\nif (fileId) {\n  return {\n    json: jsonOutput,\n    binary: {\n      data: {\n        fileId,\n        mimeType: fileMimeType || 'application/octet-stream'\n        // ⚠️ здесь ещё не сам файл, а подготовка — файл будет загружен в `Get a file`\n      }\n    }\n  };\n}\n\nreturn {\n  json: jsonOutput\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -144,
+        848
+      ],
+      "id": "914ce629-87b5-40a7-8ae9-457bdfe9b40c",
+      "name": "Код котоый писал с gpt"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.parsed.command }}",
+                    "rightValue": "/start",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "70e88a17-44b3-47c1-8dd5-ece09bc7ace1"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Старт"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "1582f1d4-572e-4fec-b88e-3cd0e79eae69",
+                    "leftValue": "={{ $json.parsed.command }}",
+                    "rightValue": "/tarif",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Моя подписка"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "6a14430e-6ef1-432e-bab6-4651dae737e5",
+                    "leftValue": "={{ $json.parsed.command }}",
+                    "rightValue": "/oplata",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Как оплатить подписку"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "79b01c46-3ec6-417d-93d7-50b3609d6b0e",
+                    "leftValue": "={{ $json.parsed.command }}",
+                    "rightValue": "/dobavit",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Добавить клиента"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "c22c1149-65aa-4973-a0b8-dddbd2431e00",
+                    "leftValue": "={{ $json.parsed.command }}",
+                    "rightValue": "/klienty",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Мои клиенты"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "a1bb625b-e9be-401e-9694-d0fb44193260",
+                    "leftValue": "={{ $json.parsed.command }}",
+                    "rightValue": "/yurist",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Вопрос ИИ юристу"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "01dc09b6-e149-4126-96fb-b6fa45fa2729",
+                    "leftValue": "={{ $json.parsed.command }}",
+                    "rightValue": "/podderzhka",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Поддержка"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "645ddd43-af3e-45a2-85ba-c71e07a074eb",
+                    "leftValue": "={{ $json.parsed.command }}",
+                    "rightValue": "/general",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Обычное сообщение"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        912,
+        736
+      ],
+      "id": "e62f4232-fd52-43ba-bcd2-d04b8b500fa7",
+      "name": "Переключатель команд"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.messageText || $json.text }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=System Prompt (for AI Agent):\n\nYou are an AI assistant in a Telegram bot for real estate agents.\nYour task is to analyze the user message and determine what the user wants.\nRecognize whether the message is a command or a general request, and return the result in JSON format.\n\nTelegram bot supports these commands:\n\n/start — start or register\n\n/help — show help\n\n/tarif — show tariffs\n\n/oplata — show payment info\n\n/dobavit — add a client or property\n\n/klienty — show client list\n\n/yurist — legal question\n\n/podderzhka — support request\n\n/general — general message\n\nYou also know about the user:\n\nFirst name: {{ $('telegramInput').item.json.message.from.first_name }}\n\nLast name: {{ $('telegramInput').item.json.message.from.last_name }}\n\nUsername: {{ $('telegramInput').item.json.message.from.username }}\n\nSubscription: \n\nIf the subscription is inactive, provide a simple reply and mention that some features are locked.\n\nIf the subscription is active, allow access to full functionality and offer deeper help."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.1,
+      "position": [
+        352,
+        832
+      ],
+      "id": "fc97aba7-73e4-49cb-955d-7e6ec315bc25",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "options": {
+          "maxTokens": 500,
+          "responseFormat": "text",
+          "temperature": 0.4
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        224,
+        1072
+      ],
+      "id": "e200f01b-7d22-4941-b01c-fca4693385ca",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "1VQuClXCUL81wSa4",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Переключатель голосового и текста').item.json.userId }}",
+        "text": "={{ $json.output }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "bce9554c-b9db-4231-861d-0bebcb8a0c4f",
+      "name": "telegramResponse",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        2864,
+        960
+      ],
+      "webhookId": "ff71ba7e-affa-4952-90a5-6bb7f37a5598",
+      "typeVersion": 1.2,
+      "credentials": {
+        "telegramApi": {
+          "id": "QxnWdjEP42jcVdoU",
+          "name": "Telegram account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3cf4ed27-5b47-40a5-a9e7-71365267ed78",
+              "name": "text",
+              "value": "={{ $json.text }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        608,
+        528
+      ],
+      "id": "7f465d29-dd1e-474c-b84a-07ee5837daab",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.fileId }}"
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        528
+      ],
+      "id": "10934b6b-2b34-43f6-8c37-643643a5e038",
+      "name": "Get a file",
+      "webhookId": "e57aff78-6bd3-4d5c-b6d0-f8049172166a",
+      "credentials": {
+        "telegramApi": {
+          "id": "QxnWdjEP42jcVdoU",
+          "name": "Telegram account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "operation": "transcribe",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        416,
+        528
+      ],
+      "id": "418d4144-94b9-4bd3-9c3c-44e7fb47abba",
+      "name": "Transcribe a recording",
+      "credentials": {
+        "openAiApi": {
+          "id": "1VQuClXCUL81wSa4",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.originalMessage.voice.mime_type }}",
+                    "rightValue": "={{ $json.originalMessage.voice.file_id }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "exists",
+                      "singleValue": true
+                    },
+                    "id": "79328c7a-3b5a-4f2f-8fd8-00023df5d48e"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Голосовое "
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "f16e36ff-4140-45e6-9f53-41ea5bed1805",
+                    "leftValue": "={{ $json.messageType }}",
+                    "rightValue": "=text",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Текстовое"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "1819617b-2495-4ac7-94ba-207a3bcee689",
+                    "leftValue": "={{ $json.messageType }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Фотография"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "ca3ddd24-8eba-45bc-a4ae-a1050774347e",
+                    "leftValue": "={{ $json.messageType }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Документ"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        48,
+        816
+      ],
+      "id": "c0633191-751b-4ade-85ca-1d8fa2bf76a5",
+      "name": "Переключатель голосового и текста"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.1,
+      "position": [
+        2016,
+        784
+      ],
+      "id": "f089dc77-b792-45da-85fd-612668372118",
+      "name": "AI Agent1",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "cafc40ea-1654-41de-83f9-1b435979cb6d"
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        2320,
+        800
+      ],
+      "id": "1128bc06-3f88-4b03-816e-08c45f537f00",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6c5945be-f353-4600-8f03-524a2cb2ce61",
+              "name": "parsed",
+              "value": "={{ JSON.parse($json.output.replace(/^```json|```$/g, '').trim()) }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        704,
+        832
+      ],
+      "id": "150e23d7-da9d-4ce3-bcd3-60a4e1506375",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3a816daa-8004-4b73-827e-ed8dede2fc44",
+              "leftValue": "",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2528,
+        800
+      ],
+      "id": "c5122847-fc85-4b8b-8b3e-8929ca3f563b",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Переключатель голосового и текста').item.json.userId }}",
+        "text": "=Привет, {{ $('Код котоый писал с gpt').item.json.originalMessage.from.first_name }} 👋  \nЯ твой AI‑помощник риелтора.\nЧем я могу помочь:\n- Вести CRM‑систему по клиентам: сохранять данные, контакты и потребности.\n- Отвечать на юридические вопросы по недвижимости.\n- Вести свободный чат‑диалог с ИИ (в бесплатной версии — до 10 запросов).\n- Давать полезные и точные ответы, подсказывать и сопровождать сделки.\n- Мягко напоминать о преимуществах и возможностях подписки.\n\nДоступные команды:\n/start — приветствие\n/tarif — моя подписка\n/oplata — как оплатить (инструкция по оплате)\n/dobavit — добавить клиента (только по подписке)\n/klienty — мои клиенты (только по подписке)\n/yurist — юридический вопрос (до 10 бесплатных, далее по подписке)\n/podderzhka — поддержка (связаться напрямую)",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": " Моя подписка",
+                    "additionalFields": {
+                      "callback_data": "/tarif"
+                    }
+                  },
+                  {
+                    "text": "Как оплатить",
+                    "additionalFields": {
+                      "callback_data": "/oplata"
+                    }
+                  },
+                  {
+                    "text": "Поддержка",
+                    "additionalFields": {
+                      "callback_data": "/podderzhka"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "d878b1bc-5de0-43c7-9a97-457dfd0e8ed6",
+      "name": "telegramResponse1",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        1120,
+        560
+      ],
+      "webhookId": "ff71ba7e-affa-4952-90a5-6bb7f37a5598",
+      "typeVersion": 1.2,
+      "credentials": {
+        "telegramApi": {
+          "id": "QxnWdjEP42jcVdoU",
+          "name": "Telegram account 2"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "telegramInput": {
+      "main": [
+        [
+          {
+            "node": "Код котоый писал с gpt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Код котоый писал с gpt": {
+      "main": [
+        [
+          {
+            "node": "Переключатель голосового и текста",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Переключатель команд": {
+      "main": [
+        [
+          {
+            "node": "telegramResponse1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get a file": {
+      "main": [
+        [
+          {
+            "node": "Transcribe a recording",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcribe a recording": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Переключатель голосового и текста": {
+      "main": [
+        [
+          {
+            "node": "Get a file",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [],
+        []
+      ]
+    },
+    "AI Agent1": {
+      "main": [
+        []
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Переключатель команд",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "c9a2cdbf-9ce4-49c8-a1b0-a2fc30eff976",
+  "meta": {
+    "templateId": "self-building-ai-agent",
+    "templateCredsSetupCompleted": true,
+    "instanceId": "6f19d11a51a64d2368a948f5b3af80effed26dfeed73a2f02e905f8a53c9c1c8"
+  },
+  "id": "W50umtNr9ugOEdNU",
+  "tags": []
+}

@@ -6,17 +6,28 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
-    "test": "node --check index.js"
+    "start:prod": "NODE_ENV=production node --max-old-space-size=512 index.js",
+    "test": "node --check index.js",
+    "analyze": "node --inspect index.js",
+    "benchmark": "node --prof index.js",
+    "monitor": "node --trace-warnings --trace-deprecation index.js"
   },
   "keywords": [
     "telegram",
     "openai",
-    "bot"
+    "bot",
+    "performance",
+    "optimized"
   ],
   "author": "",
   "license": "ISC",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "dependencies": {
     "openai": "^5.11.0",
     "telegraf": "^4.16.3"
-  }
+  },
+  "devDependencies": {},
+  "optionalDependencies": {}
 }

@@ -1,0 +1,1118 @@
+{
+  "name": "Optimized Realtor Bot Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message",
+          "callback_query"
+        ],
+        "additionalFields": {
+          "download": true
+        }
+      },
+      "id": "telegram-trigger",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "position": [
+        -1200,
+        400
+      ],
+      "typeVersion": 1.1,
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CREDENTIALS_ID",
+          "name": "Telegram Bot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Улучшенный парсер входящих сообщений\nconst body = $json;\n\n// Обработка callback query и обычных сообщений\nconst isCallback = body.callback_query ? true : false;\nconst message = body.message || body.callback_query?.message || {};\nconst callbackData = body.callback_query?.data || null;\nconst user = body.callback_query?.from || body.message?.from || {};\n\nif (!message && !isCallback) {\n  return { json: { error: 'No message or callback found' } };\n}\n\nconst chatId = message.chat?.id || body.callback_query?.message?.chat?.id;\nconst userId = user.id;\nconst username = user.username || user.first_name || 'User';\nconst firstName = user.first_name || '';\nconst lastName = user.last_name || '';\n\n// Определение типа сообщения и команды\nlet messageText = '';\nlet messageType = 'text';\nlet command = null;\nlet fileId = null;\nlet fileMimeType = null;\n\nif (isCallback) {\n  messageType = 'callback';\n  command = callbackData;\n  messageText = `[Callback: ${callbackData}]`;\n} else if (message.text) {\n  messageText = message.text.trim();\n  messageType = 'text';\n  \n  // Простое определение команды\n  if (messageText.startsWith('/')) {\n    command = messageText.split(' ')[0].toLowerCase();\n  }\n} else if (message.voice) {\n  messageType = 'voice';\n  fileId = message.voice.file_id;\n  fileMimeType = message.voice.mime_type;\n  messageText = '[Голосовое сообщение]';\n} else if (message.audio) {\n  messageType = 'audio';\n  fileId = message.audio.file_id;\n  fileMimeType = message.audio.mime_type;\n  messageText = '[Аудио сообщение]';\n} else if (message.document) {\n  messageType = 'document';\n  fileId = message.document.file_id;\n  fileMimeType = message.document.mime_type;\n  messageText = `[Документ: ${message.document.file_name || 'unknown'}]`;\n} else if (message.photo) {\n  messageType = 'photo';\n  const photos = message.photo;\n  fileId = photos[photos.length - 1].file_id;\n  messageText = '[Фотография]';\n}\n\nreturn {\n  json: {\n    chatId,\n    userId,\n    username,\n    firstName,\n    lastName,\n    messageText,\n    messageType,\n    command,\n    fileId,\n    fileMimeType,\n    isCallback,\n    originalMessage: message,\n    callbackQueryId: body.callback_query?.id\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1000,
+        400
+      ],
+      "id": "message-parser",
+      "name": "Message Parser"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "/start",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "start_command"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "/tarif",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "subscription_info"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "/oplata",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "payment_info"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "/help",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "help_command"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.messageType }}",
+                    "rightValue": "voice",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "voice_message"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.messageType }}",
+                    "rightValue": "photo",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "photo_message"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.messageType }}",
+                    "rightValue": "document",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "document_message"
+            }
+          ]
+        },
+        "fallbackOutput": "single",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -800,
+        400
+      ],
+      "id": "message-router",
+      "name": "Message Router"
+    },
+    {
+      "parameters": {
+        "workflowId": "{{ $workflow.id }}",
+        "waitForSubWorkflow": true
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        -600,
+        200
+      ],
+      "id": "check-subscription",
+      "name": "Check Subscription",
+      "notes": "Вызывает субворкфлоу для проверки подписки пользователя"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "=Привет, {{ $json.firstName || 'друг' }}! 👋\n\nЯ твой AI-помощник риелтора.\n\n🏠 **Что я умею:**\n• Веду CRM-систему клиентов\n• Отвечаю на юридические вопросы\n• Анализирую документы и фото\n• Веду диалог с ИИ\n\n📋 **Команды:**\n/tarif — моя подписка\n/oplata — как оплатить\n/help — помощь\n\nПросто пишите или отправляйте голосовые сообщения!",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "📊 Моя подписка",
+                    "additionalFields": {
+                      "callback_data": "/tarif"
+                    }
+                  },
+                  {
+                    "text": "💳 Оплатить",
+                    "additionalFields": {
+                      "callback_data": "/oplata"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "❓ Помощь",
+                    "additionalFields": {
+                      "callback_data": "/help"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -400,
+        100
+      ],
+      "id": "start-response",
+      "name": "Start Response",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CREDENTIALS_ID",
+          "name": "Telegram Bot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Проверка подписки пользователя\nconst userId = $json.userId;\nconst currentDate = new Date();\n\n// TODO: Здесь должна быть реальная проверка в базе данных\n// Пример проверки подписки\nconst subscriptionEndDate = new Date('2025-12-31'); // Замените на реальную дату из БД\nconst isSubscribed = currentDate <= subscriptionEndDate;\n\n// Счетчик бесплатных запросов для неподписанных пользователей\nconst freeRequestsUsed = 0; // TODO: Получить из БД\nconst maxFreeRequests = 10;\nconst canUseFreeRequests = freeRequestsUsed < maxFreeRequests;\n\nreturn {\n  json: {\n    ...($json),\n    subscription: {\n      isActive: isSubscribed,\n      endDate: subscriptionEndDate.toISOString(),\n      freeRequestsUsed,\n      maxFreeRequests,\n      canUseFreeRequests: !isSubscribed && canUseFreeRequests\n    }\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -600,
+        400
+      ],
+      "id": "subscription-checker",
+      "name": "Subscription Checker"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "=📊 **Статус подписки**\n\n{{ $json.subscription.isActive ? '✅ Подписка активна' : '❌ Подписка неактивна' }}\n\n{{ $json.subscription.isActive ? \n  '🎯 **Доступно:**\\n• Безлимитный чат с ИИ\\n• CRM система клиентов\\n• Юридические консультации\\n• Анализ документов\\n\\n📅 Действует до: ' + $json.subscription.endDate.split('T')[0] :\n  '🆓 **Бесплатный доступ:**\\n• Чат с ИИ: ' + ($json.subscription.maxFreeRequests - $json.subscription.freeRequestsUsed) + ' из ' + $json.subscription.maxFreeRequests + ' запросов\\n\\n💎 **По подписке:**\\n• Безлимитный ИИ\\n• CRM клиентов\\n• Юридическая помощь' }}",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "{{ $json.subscription.isActive ? '🔄 Управление' : '💳 Оформить подписку' }}",
+                    "additionalFields": {
+                      "callback_data": "/oplata"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -400,
+        200
+      ],
+      "id": "subscription-response",
+      "name": "Subscription Response",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CREDENTIALS_ID",
+          "name": "Telegram Bot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "=💳 **Как оплатить подписку**\n\n🎯 **Тариф:** 990₽/месяц\n\n✨ **Что включено:**\n• Безлимитный чат с ИИ\n• CRM система для клиентов\n• Юридические консультации\n• Анализ документов и фото\n• Персональная память ИИ\n\n📱 **Способы оплаты:**\n• Банковская карта\n• СБП (Система быстрых платежей)\n• Криптовалюта\n\n🔗 **Ссылка для оплаты:** \n[Оплатить подписку](https://your-payment-link.com)\n\n❓ Вопросы? Напишите /podderzhka",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "💳 Оплатить сейчас",
+                    "additionalFields": {
+                      "url": "https://your-payment-link.com"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "🆘 Поддержка",
+                    "additionalFields": {
+                      "callback_data": "/podderzhka"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -400,
+        300
+      ],
+      "id": "payment-response",
+      "name": "Payment Response",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CREDENTIALS_ID",
+          "name": "Telegram Bot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.fileId }}"
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -400,
+        500
+      ],
+      "id": "download-voice-file",
+      "name": "Download Voice File",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CREDENTIALS_ID",
+          "name": "Telegram Bot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "operation": "transcribe",
+        "options": {
+          "language": "ru",
+          "prompt": "Это голосовое сообщение от риелтора или клиента. Может содержать информацию о недвижимости, сделках, юридических вопросах."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        -200,
+        500
+      ],
+      "id": "transcribe-voice",
+      "name": "Transcribe Voice",
+      "credentials": {
+        "openAiApi": {
+          "id": "YOUR_OPENAI_CREDENTIALS_ID",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "transcribed-text",
+              "name": "messageText",
+              "value": "={{ $json.text }}",
+              "type": "string"
+            },
+            {
+              "id": "update-type",
+              "name": "messageType",
+              "value": "text",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        500
+      ],
+      "id": "update-transcribed-message",
+      "name": "Update Transcribed Message"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.subscription.isActive }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        200,
+        400
+      ],
+      "id": "subscription-gate",
+      "name": "Subscription Gate"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.subscription.canUseFreeRequests }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        200,
+        600
+      ],
+      "id": "free-request-gate",
+      "name": "Free Request Gate"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.messageText }}",
+        "hasOutputParser": false,
+        "options": {
+          "systemMessage": "=Ты — AI-помощник риелтора в Telegram-боте.\n\n**Контекст пользователя:**\n- Имя: {{ $json.firstName || 'Пользователь' }}\n- Username: @{{ $json.username }}\n- ID: {{ $json.userId }}\n- Подписка: {{ $json.subscription.isActive ? 'Активна до ' + $json.subscription.endDate.split('T')[0] : 'Неактивна (' + ($json.subscription.maxFreeRequests - $json.subscription.freeRequestsUsed) + ' бесплатных запросов)' }}\n\n**Твоя роль:**\n1. Помогаешь с вопросами по недвижимости\n2. Консультируешь по юридическим аспектам сделок\n3. Анализируешь документы и ситуации\n4. Даешь практические советы риелторам\n\n**Стиль общения:**\n- Профессиональный, но дружелюбный\n- Конкретные и полезные ответы\n- При необходимости задавай уточняющие вопросы\n- Если нужна подписка для полного ответа, мягко упомяни это\n\n**Ограничения:**\n- Не даешь юридические заключения (только общие консультации)\n- Рекомендуешь обращаться к специалистам в сложных случаях\n- Помни о лимитах для пользователей без подписки"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.1,
+      "position": [
+        400,
+        400
+      ],
+      "id": "ai-realtor-agent",
+      "name": "AI Realtor Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list"
+        },
+        "options": {
+          "maxTokens": 1000,
+          "temperature": 0.7,
+          "responseFormat": "text"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        400,
+        600
+      ],
+      "id": "openai-chat-model",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "YOUR_OPENAI_CREDENTIALS_ID",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ 'user_' + $json.userId }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        400,
+        750
+      ],
+      "id": "postgres-memory",
+      "name": "Postgres Chat Memory",
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+          "name": "Postgres Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "retrieve",
+        "tableName": {
+          "__rl": true,
+          "value": "realtor_knowledge",
+          "mode": "list"
+        },
+        "topK": 5,
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "user_id",
+                "value": "={{ $json.userId }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [
+        400,
+        850
+      ],
+      "id": "knowledge-vector-store",
+      "name": "Knowledge Vector Store",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIALS_ID",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.output }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "replyToMessageId": "={{ $('message-parser').item.json.originalMessage.message_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        600,
+        400
+      ],
+      "id": "ai-response",
+      "name": "AI Response",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CREDENTIALS_ID",
+          "name": "Telegram Bot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "=🚫 **Лимит бесплатных запросов исчерпан**\n\nВы использовали все {{ $json.subscription.maxFreeRequests }} бесплатных запросов к ИИ.\n\n💎 **Оформите подписку для:**\n• Безлимитного общения с ИИ\n• Доступа к CRM системе\n• Юридических консультаций\n• Анализа документов\n\n💳 Стоимость: 990₽/месяц",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "💳 Оформить подписку",
+                    "additionalFields": {
+                      "callback_data": "/oplata"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        600,
+        600
+      ],
+      "id": "limit-exceeded-response",
+      "name": "Limit Exceeded Response",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CREDENTIALS_ID",
+          "name": "Telegram Bot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "user_messages",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "user_id",
+              "fieldValue": "={{ $json.userId }}"
+            },
+            {
+              "fieldId": "chat_id",
+              "fieldValue": "={{ $json.chatId }}"
+            },
+            {
+              "fieldId": "username",
+              "fieldValue": "={{ $json.username }}"
+            },
+            {
+              "fieldId": "first_name",
+              "fieldValue": "={{ $json.firstName }}"
+            },
+            {
+              "fieldId": "message_text",
+              "fieldValue": "={{ $json.messageText }}"
+            },
+            {
+              "fieldId": "message_type",
+              "fieldValue": "={{ $json.messageType }}"
+            },
+            {
+              "fieldId": "command",
+              "fieldValue": "={{ $json.command }}"
+            },
+            {
+              "fieldId": "is_subscribed",
+              "fieldValue": "={{ $json.subscription.isActive }}"
+            },
+            {
+              "fieldId": "ai_response",
+              "fieldValue": "={{ $('ai-realtor-agent').item.json.output }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        800,
+        400
+      ],
+      "id": "log-conversation",
+      "name": "Log Conversation",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIALS_ID",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Обновление счетчика бесплатных запросов\nconst userId = $json.userId;\nconst isSubscribed = $json.subscription.isActive;\n\nif (!isSubscribed) {\n  // TODO: Обновить счетчик в базе данных\n  // UPDATE users SET free_requests_used = free_requests_used + 1 WHERE user_id = userId\n  console.log(`Incrementing free request counter for user ${userId}`);\n}\n\nreturn { json: $json };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        500
+      ],
+      "id": "update-request-counter",
+      "name": "Update Request Counter"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "=❓ **Помощь по боту**\n\n🤖 **Основные команды:**\n/start — начать работу\n/tarif — проверить подписку\n/oplata — оформить подписку\n/help — эта справка\n\n💬 **Как пользоваться:**\n• Пишите текстовые сообщения\n• Отправляйте голосовые сообщения\n• Загружайте документы и фото\n• Задавайте вопросы по недвижимости\n\n🏠 **Специализация:**\n• Юридические вопросы по недвижимости\n• Анализ документов\n• Советы по сделкам\n• CRM система клиентов (по подписке)\n\n🆘 **Поддержка:** @your_support_username",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "🏠 Начать работу",
+                    "additionalFields": {
+                      "callback_data": "/start"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -400,
+        400
+      ],
+      "id": "help-response",
+      "name": "Help Response",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CREDENTIALS_ID",
+          "name": "Telegram Bot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "=🤔 **Команда не найдена**\n\nИзвините, я не понимаю эту команду.\n\n📋 **Доступные команды:**\n/start — начать работу\n/tarif — моя подписка\n/oplata — оплатить подписку\n/help — помощь\n\n💡 **Или просто напишите вопрос** — я отвечу как AI-помощник!",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "❓ Помощь",
+                    "additionalFields": {
+                      "callback_data": "/help"
+                    }
+                  },
+                  {
+                    "text": "🏠 Главная",
+                    "additionalFields": {
+                      "callback_data": "/start"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -400,
+        800
+      ],
+      "id": "fallback-response",
+      "name": "Fallback Response",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CREDENTIALS_ID",
+          "name": "Telegram Bot API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "telegram-trigger": {
+      "main": [
+        [
+          {
+            "node": "message-parser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "message-parser": {
+      "main": [
+        [
+          {
+            "node": "message-router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "message-router": {
+      "main": [
+        [
+          {
+            "node": "subscription-checker",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "subscription-checker",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "subscription-checker",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "subscription-checker",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "download-voice-file",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "subscription-checker",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "subscription-checker",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "subscription-checker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "subscription-checker": {
+      "main": [
+        [
+          {
+            "node": "start-response",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "subscription-response",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "payment-response",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "help-response",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "subscription-gate",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "fallback-response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "download-voice-file": {
+      "main": [
+        [
+          {
+            "node": "transcribe-voice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "transcribe-voice": {
+      "main": [
+        [
+          {
+            "node": "update-transcribed-message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update-transcribed-message": {
+      "main": [
+        [
+          {
+            "node": "subscription-gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "subscription-gate": {
+      "main": [
+        [
+          {
+            "node": "ai-realtor-agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "free-request-gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "free-request-gate": {
+      "main": [
+        [
+          {
+            "node": "ai-realtor-agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "limit-exceeded-response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ai-realtor-agent": {
+      "main": [
+        [
+          {
+            "node": "ai-response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "openai-chat-model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "ai-realtor-agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "postgres-memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "ai-realtor-agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "knowledge-vector-store": {
+      "ai_tool": [
+        [
+          {
+            "node": "ai-realtor-agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ai-response": {
+      "main": [
+        [
+          {
+            "node": "log-conversation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "log-conversation": {
+      "main": [
+        [
+          {
+            "node": "update-request-counter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": {
+      "id": "ERROR_WORKFLOW_ID"
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "id": "optimized-realtor-bot",
+  "tags": [
+    "telegram",
+    "ai",
+    "realtor",
+    "bot",
+    "optimized"
+  ]
+}

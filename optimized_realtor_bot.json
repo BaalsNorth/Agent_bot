@@ -204,21 +204,7 @@
       "id": "message-router",
       "name": "Message Router"
     },
-    {
-      "parameters": {
-        "workflowId": "{{ $workflow.id }}",
-        "waitForSubWorkflow": true
-      },
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1,
-      "position": [
-        -600,
-        200
-      ],
-      "id": "check-subscription",
-      "name": "Check Subscription",
-      "notes": "Вызывает субворкфлоу для проверки подписки пользователя"
-    },
+
     {
       "parameters": {
         "chatId": "={{ $json.chatId }}",

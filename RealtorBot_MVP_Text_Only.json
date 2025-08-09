@@ -1,0 +1,574 @@
+{
+  "name": "RealtorBot_MVP_Text_Only",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "32815",
+      "name": "telegramInput",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1,
+      "position": [
+        80,
+        180
+      ],
+      "notesInFlow": true,
+      "notes": "Trigger on any incoming message"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Normalize Telegram message into a stable shape\nconst m = $json.message || $json;\nconst from = m.from || {};\nconst chat = m.chat || {};\n\nconst isVoice = !!(m.voice && m.voice.file_id);\nconst isText = !!m.text;\n\nconst messageText = isText ? m.text : '';\n\nreturn [{\n  json: {\n    raw: m,\n    messageType: isVoice ? 'voice' : 'text',\n    messageText,\n    fileId: isVoice ? m.voice.file_id : null,\n    mimeType: isVoice ? 'audio/ogg' : null,\n    user: {\n      id: from.id,\n      username: from.username || null,\n      first_name: from.first_name || null,\n      last_name: from.last_name || null,\n    },\n    chatId: chat.id\n  }\n}];\n"
+      },
+      "id": "78413",
+      "name": "Normalize",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        320,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/users?telegram_id=eq.{{$json.user.id}}",
+        "options": {},
+        "allowUnauthorizedCerts": true,
+        "sendBinaryData": false,
+        "headerParametersUi": {
+          "parameter": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$env.SUPABASE_KEY}}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "8864",
+      "name": "Supabase GetUser",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        560,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// If user exists, pass through.\n// Else, create initial user with trial_started_at = now and subscription_status='inactive'\nconst res = items[0].json; // from GetUser\nconst list = Array.isArray(res) ? res : (res.data || []);\nif (list.length > 0) {\n  return items.map(i => ({ json: { userRow: list[0] } }));\n} else {\n  // mark to create\n  return [{ json: { userRow: null, create: true } }];\n}\n"
+      },
+      "id": "14512",
+      "name": "EnsureUser (branch)",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        760,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/users",
+        "options": {},
+        "allowUnauthorizedCerts": true,
+        "sendBinaryData": false,
+        "headerParametersUi": {
+          "parameter": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$env.SUPABASE_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "jsonParameters": true,
+        "payloadJson": "{\n  \"telegram_id\": {{$json.user.id}},\n  \"username\": \"={{$json.user.username}}\",\n  \"first_name\": \"={{$json.user.first_name}}\",\n  \"last_name\": \"={{$json.user.last_name}}\",\n  \"trial_started_at\": \"={{$now}}\",\n  \"subscription_status\": \"inactive\"\n}\n"
+      },
+      "id": "96384",
+      "name": "Supabase CreateUser",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        980,
+        -20
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "passThrough",
+        "join": "combine"
+      },
+      "id": "63434",
+      "name": "UserRow",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        1180,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Compute trialActive and gate\nconst input = $json.userRow || ($json[0] && $json[0].userRow);\nconst u = input || {};\nconst sub = (u.subscription_status || 'inactive').toLowerCase();\nlet trialActive = false;\nif (u.trial_started_at) {\n  const start = new Date(u.trial_started_at);\n  const now = new Date();\n  const diffDays = Math.floor((now - start) / (1000*60*60*24));\n  trialActive = diffDays <= 3;\n} else {\n  trialActive = true;\n}\nconst gate = trialActive || sub === 'active';\nreturn [{ json: { gate, trialActive, subscription_status: sub, userRow: u } }];\n"
+      },
+      "id": "77628",
+      "name": "TrialGate",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        1380,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "systemMessage": "Ты — классификатор сообщений для телеграм-бота риелторов.\nВерни JSON с полями: { \"type\": \"command|general\", \"command\": \"/start|/help|/tarif|/privacy|null\" }\nЕсли текст начинается с /команды — это command с соответствующим значением.\nИначе — general.\n",
+        "prompt": "={{$json.messageText || ''}}",
+        "responseFormat": "json"
+      },
+      "id": "54994",
+      "name": "Classifier",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 4,
+      "position": [
+        560,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "value1": "={{$json.type}}",
+        "rules": [
+          {
+            "operation": "equal",
+            "value": "command"
+          },
+          {
+            "operation": "equal",
+            "value": "general"
+          }
+        ]
+      },
+      "id": "36070",
+      "name": "Route: command or general",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 2,
+      "position": [
+        760,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "value1": "={{$json.command}}",
+        "rules": [
+          {
+            "operation": "equal",
+            "value": "/start"
+          },
+          {
+            "operation": "equal",
+            "value": "/help"
+          },
+          {
+            "operation": "equal",
+            "value": "/tarif"
+          },
+          {
+            "operation": "equal",
+            "value": "/privacy"
+          }
+        ]
+      },
+      "id": "23659",
+      "name": "Which command?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 2,
+      "position": [
+        980,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{$json.chatId}}",
+        "text": "👋 Привет! У тебя активирован бесплатный триал на 3 дня. Доступ: консультации, загрузка документов, CRM. Команды: /help /tarif /privacy",
+        "additionalFields": {}
+      },
+      "id": "97962",
+      "name": "Send /start",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        1200,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{$json.chatId}}",
+        "text": "Команды: /start /help /tarif /privacy. Пиши вопрос текстом или голосом — я помогу с юридическими и рыночными вопросами по СПб. Для CRM используй /dobavit и /klienty (в следующем обновлении).",
+        "additionalFields": {}
+      },
+      "id": "88311",
+      "name": "Send /help",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        1200,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{$json.chatId}}",
+        "text": "Тарифы: триал 3 дня бесплатно. Подписка — 2900 руб/мес (для некоторых 2200 руб/мес). Команда /oplata — получишь ссылку на оплату (в следующем обновлении).",
+        "additionalFields": {}
+      },
+      "id": "24730",
+      "name": "Send /tarif",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        1200,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{$json.chatId}}",
+        "text": "Политика конфиденциальности: ссылка на документ (хостинг в РФ). Нажимая /start, ты даёшь согласие на обработку ПДн. Для удаления данных напиши: Удалить мои данные.",
+        "additionalFields": {}
+      },
+      "id": "29745",
+      "name": "Send /privacy",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        1200,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "systemMessage": "Ты — ИИ‑ассистент по недвижимости Санкт‑Петербурга для профессиональных риелторов.\nОбщайся дружелюбно, по делу, без воды. Если вопрос про документы, перечисли шаги и предупреждения.\nЕсли запрос содержит персональные данные, напомни про /privacy.\nЕсли gate=false, мягко предложи оформить подписку.\n",
+        "prompt": "={{$json.messageText || ''}}"
+      },
+      "id": "38925",
+      "name": "RealtorAgent",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 4,
+      "position": [
+        980,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.gate}}",
+              "operation": "isTrue"
+            }
+          ]
+        }
+      },
+      "id": "59913",
+      "name": "Gate allowed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1180,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{$json.chatId}}",
+        "text": "={{$json.data || $json.answer || $json}}"
+      },
+      "id": "68788",
+      "name": "Send AI reply",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        1380,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{$json.chatId}}",
+        "text": "Триал завершён. Чтобы продолжить пользоваться ботом (юридические разборы, CRM, документы), оформи подписку. Команда: /tarif"
+      },
+      "id": "50747",
+      "name": "Send Paywall",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        1380,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/messages",
+        "options": {},
+        "allowUnauthorizedCerts": true,
+        "sendBinaryData": false,
+        "headerParametersUi": {
+          "parameter": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$env.SUPABASE_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "jsonParameters": true,
+        "payloadJson": "{\n  \"user_id\": {{$json.user.id}},\n  \"chat_id\": {{$json.chatId}},\n  \"message_type\": \"={{$json.messageType}}\",\n  \"message_text\": \"={{$json.messageText}}\",\n  \"bot_reply\": \"={{$json.bot_reply || ''}}\"\n}\n"
+      },
+      "id": "95002",
+      "name": "Supabase LogMessage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1600,
+        380
+      ]
+    }
+  ],
+  "connections": {
+    "telegramInput": {
+      "main": [
+        [
+          {
+            "node": "Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize": {
+      "main": [
+        [
+          {
+            "node": "Supabase GetUser",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Classifier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase GetUser": {
+      "main": [
+        [
+          {
+            "node": "EnsureUser (branch)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "EnsureUser (branch)": {
+      "main": [
+        [
+          {
+            "node": "Supabase CreateUser",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "UserRow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase CreateUser": {
+      "main": [
+        [
+          {
+            "node": "UserRow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "UserRow": {
+      "main": [
+        [
+          {
+            "node": "TrialGate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classifier": {
+      "main": [
+        [
+          {
+            "node": "Route: command or general",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route: command or general": {
+      "main": [
+        [
+          {
+            "node": "Which command?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RealtorAgent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Which command?": {
+      "main": [
+        [
+          {
+            "node": "Send /start",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send /help",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send /tarif",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send /privacy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TrialGate": {
+      "main": [
+        [
+          {
+            "node": "Gate allowed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RealtorAgent": {
+      "main": [
+        [
+          {
+            "node": "Gate allowed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate allowed?": {
+      "main": [
+        [
+          {
+            "node": "Send AI reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Paywall",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send AI reply": {
+      "main": [
+        [
+          {
+            "node": "Supabase LogMessage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Paywall": {
+      "main": [
+        [
+          {
+            "node": "Supabase LogMessage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "staticData": null,
+  "pinData": {}
+}

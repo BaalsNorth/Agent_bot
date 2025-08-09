@@ -1,0 +1,422 @@
+{
+  "name": "RealtorBot_FULL_SKELETON_12pts",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "218783",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1,
+      "position": [
+        200,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Extract chatId, user, text/voice/file\nconst m = $json.message || $json;\nreturn [{ json: { chatId: m.chat?.id, user: m.from, text: m.text || '', voice: m.voice || null, document: m.document || null, photo: m.photo || null } }];"
+      },
+      "id": "672706",
+      "name": "Normalize",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        200,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Compute trialActive and gate based on user row (to be filled from DB)\nconst u = $json.userRow || {};\nlet trialActive = true; // placeholder\nlet subscription = 'inactive';\nreturn [{ json: { ...$json, trialActive, subscription, gate: trialActive || subscription==='active' } }];"
+      },
+      "id": "768019",
+      "name": "TrialGate",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        200,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "chat",
+        "model": "gpt-4o-mini",
+        "systemMessage": "Ты классификатор. Верни JSON: {\"type\":\"command|general\",\"command\":\"/start|/help|/tarif|/privacy|/dobavit|/klienty|null\"}",
+        "prompt": "={{$json.text}}",
+        "responseFormat": "json"
+      },
+      "id": "349754",
+      "name": "Classifier",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 4,
+      "position": [
+        200,
+        580
+      ]
+    },
+    {
+      "parameters": {
+        "value1": "={{$json.command}}",
+        "rules": [
+          {
+            "operation": "equal",
+            "value": "/start"
+          },
+          {
+            "operation": "equal",
+            "value": "/help"
+          },
+          {
+            "operation": "equal",
+            "value": "/tarif"
+          },
+          {
+            "operation": "equal",
+            "value": "/privacy"
+          },
+          {
+            "operation": "equal",
+            "value": "/dobavit"
+          },
+          {
+            "operation": "equal",
+            "value": "/klienty"
+          }
+        ]
+      },
+      "id": "479699",
+      "name": "Switch Command",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 2,
+      "position": [
+        200,
+        740
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{$json.chatId}}",
+        "text": "👋 Добро пожаловать! Триал 3 дня активирован. Команды: /help /tarif /privacy"
+      },
+      "id": "328174",
+      "name": "Send /start",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        200,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{$json.chatId}}",
+        "text": "Команды: /start /help /tarif /privacy /dobavit /klienty. Пиши текстом или голосом."
+      },
+      "id": "140436",
+      "name": "Send /help",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        200,
+        1060
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{$json.chatId}}",
+        "text": "Тарифы: триал 3 дня. Подписка — 2900₽/мес. Оплата: /oplata (плейсхолдер)."
+      },
+      "id": "962913",
+      "name": "Send /tarif",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        200,
+        1220
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{$json.chatId}}",
+        "text": "Политика конфиденциальности (ссылка). Кнопка согласия и право на удаление."
+      },
+      "id": "580952",
+      "name": "Send /privacy",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        200,
+        1380
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$json.fileUrl || ''}}",
+        "responseFormat": "file",
+        "options": {}
+      },
+      "id": "907045",
+      "name": "Get Voice File",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        200,
+        1540
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "audioTranscription",
+        "model": "whisper-1"
+      },
+      "id": "53099",
+      "name": "Transcribe Voice",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 4,
+      "position": [
+        200,
+        1700
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "chat",
+        "model": "gpt-4o-mini",
+        "systemMessage": "Ты — ИИ-ассистент риелтора СПб. Консультации по недвижимости, ипотеке, документам. Соблюдай /privacy.",
+        "prompt": "={{$json.text}}"
+      },
+      "id": "714598",
+      "name": "Realtor Agent",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 4,
+      "position": [
+        200,
+        1860
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{$json.chatId}}",
+        "text": "Триал завершён. Оформи подписку: /tarif."
+      },
+      "id": "88543",
+      "name": "Send Paywall",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        200,
+        2020
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/users",
+        "method": "POST",
+        "jsonParameters": true,
+        "headerParametersUi": {
+          "parameter": []
+        },
+        "options": {}
+      },
+      "id": "429261",
+      "name": "Supabase Upsert User",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        200,
+        2180
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/messages",
+        "method": "POST",
+        "jsonParameters": true,
+        "headerParametersUi": {
+          "parameter": []
+        },
+        "options": {}
+      },
+      "id": "827980",
+      "name": "Supabase Log Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        200,
+        2340
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/clients",
+        "method": "POST",
+        "jsonParameters": true,
+        "headerParametersUi": {
+          "parameter": []
+        },
+        "options": {}
+      },
+      "id": "792564",
+      "name": "Supabase Upsert Client",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        200,
+        2500
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.perplexity.ai/chat/completions",
+        "method": "POST",
+        "jsonParameters": true,
+        "headerParametersUi": {
+          "parameter": []
+        },
+        "options": {}
+      },
+      "id": "746593",
+      "name": "Perplexity Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        200,
+        2660
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$json.mapApiUrl || ''}}",
+        "method": "GET",
+        "options": {}
+      },
+      "id": "518783",
+      "name": "2GIS / Yandex Geocoder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        200,
+        2820
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "calendar": "",
+        "additionalFields": {}
+      },
+      "id": "68222",
+      "name": "Google Calendar Create Event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 3,
+      "position": [
+        200,
+        2980
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Build .ics text file\nreturn items.map(item => ({ json: { ...item.json, ics: 'BEGIN:VCALENDAR\\n...END:VCALENDAR' } }));"
+      },
+      "id": "202978",
+      "name": "ICS Generator",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        200,
+        3140
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "chat",
+        "model": "gpt-4o-mini",
+        "systemMessage": "Извлеки поля договора (ФИО, адрес, сумма, даты) и верни JSON.",
+        "prompt": "={{$json.extractedText || ''}}"
+      },
+      "id": "993245",
+      "name": "Doc Extract",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 4,
+      "position": [
+        200,
+        3300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.RU_STORAGE_UPLOAD_URL || ''}}",
+        "method": "POST",
+        "sendBinaryData": true,
+        "headerParametersUi": {
+          "parameter": []
+        },
+        "options": {}
+      },
+      "id": "748531",
+      "name": "File to Storage (RU)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        200,
+        3460
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Mark consent_accepted_at\nreturn [{ json: { ...$json, consent_accepted_at: new Date().toISOString() } }];"
+      },
+      "id": "663008",
+      "name": "Consent Capture",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        200,
+        3620
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/clients",
+        "method": "DELETE",
+        "headerParametersUi": {
+          "parameter": []
+        },
+        "options": {}
+      },
+      "id": "405893",
+      "name": "Delete My Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        200,
+        3780
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{$json.chatId}}",
+        "text": "={{$json.text || 'OK'}}"
+      },
+      "id": "236810",
+      "name": "Telegram Send",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        200,
+        3940
+      ]
+    }
+  ],
+  "connections": {},
+  "active": false,
+  "settings": {},
+  "staticData": null,
+  "pinData": {}
+}

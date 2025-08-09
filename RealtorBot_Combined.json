@@ -371,13 +371,14 @@
     },
     {
       "parameters": {
-        "resource": "file",
-        "fileId": "={{$json.fileId}}"
+        "url": "={{$env.TELEGRAM_FILE_URL || ''}}",
+        "responseFormat": "file",
+        "options": {}
       },
       "id": "80002",
-      "name": "Download Voice File",
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1,
+      "name": "Get Voice File",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
       "position": [
         760,
         120
@@ -498,12 +499,12 @@
     },
     "Message type?": {
       "main": [
-        [ { "node": "Download Voice File", "type": "main", "index": 0 } ],
+        [ { "node": "Get Voice File", "type": "main", "index": 0 } ],
         [ ],
         [ ]
       ]
     },
-    "Download Voice File": {
+    "Get Voice File": {
       "main": [
         [ { "node": "Transcribe Voice", "type": "main", "index": 0 } ]
       ]

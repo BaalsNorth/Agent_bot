@@ -386,8 +386,7 @@
     {
       "parameters": {
         "operation": "audioTranscription",
-        "model": "whisper-1",
-        "binaryPropertyName": "data"
+        "model": "whisper-1"
       },
       "id": "80003",
       "name": "Transcribe Voice",
@@ -400,19 +399,11 @@
     },
     {
       "parameters": {
-        "keepOnlySet": false,
-        "values": {
-          "string": [
-            { "name": "messageText", "value": "={{$json.text}}" },
-            { "name": "messageType", "value": "text" }
-          ],
-          "boolean": []
-        },
-        "options": {}
+        "functionCode": "// Map transcription text to messageText and switch type to text\nconst text = $json.text || '';\nreturn [{ json: { ...$json, messageText: text, messageType: 'text' } }];"
       },
       "id": "80004",
       "name": "Use Transcription",
-      "type": "n8n-nodes-base.set",
+      "type": "n8n-nodes-base.function",
       "typeVersion": 2,
       "position": [
         1180,
